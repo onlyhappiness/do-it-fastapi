@@ -1,19 +1,23 @@
 from fastapi import FastAPI
-
 from common.middleware import custom_response_middleware
+from contextlib import asynccontextmanager
+from database import connect_to_mongo, close_mongo_connect
+from routes import user
 
-app = FastAPI()
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # start the database connection
+    await connect_to_mongo(app)
+    yield
+    # Close database connection
+    await close_mongo_connect(app)
+
+app = FastAPI(lifespan=lifespan)
 
 app.middleware('http')(custom_response_middleware)
 
-# Dummy 데이터
-dummy_data = [
-    {"id": 1, "name": "Alice", "age": 25},
-    {"id": 2, "name": "Bob", "age": 30},
-    {"id": 3, "name": "Charlie", "age": 35},
-]
+app.include_router(user.router, prefix="/users", tags=["users"])
 
-
-@app.get('/users')
-async def root():
-    return dummy_data
+@app.get('/')
+def read_root():
+    return {"Hello World"}
